@@ -1,0 +1,164 @@
+-- Made by Unlucks Doesn't require Getgenv to hard mode
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local IsDetected = false
+
+local IsInTrade1 = false
+local IsInTrade2 = false
+local IsInTrade3 = false
+
+if ReplicatedStorage.Trade.GetTradeStatus:InvokeServer() == "StartTrade" then
+    ReplicatedStorage.Trade.DeclineTrade:FireServer()
+    print("Trade declined to prevent potential bug.")
+end
+
+local remoteDetails = {}
+for i, v in pairs(ReplicatedStorage:GetDescendants()) do
+    if v:IsA("RemoteEvent") or v:IsA("RemoteFunction") then
+        table.insert(remoteDetails, {
+            Name = v.Name,
+            Parent = v.Parent,
+            ClassName = v.ClassName
+        })
+    end
+end
+
+function EndTrade()
+    while true do end
+end
+
+local getItemDataCount = 0
+local lastGetItemDataTime = 0
+
+local getFullInventoryCount = 0
+local lastGetFullInventory = 0
+
+local OldHook
+OldHook = hookmetamethod(game, "__namecall", function(self, ...)
+    local method = getnamecallmethod()
+    local args = {...}
+    if checkcaller() then
+        if typeof(self) == "Instance" then
+            if method == "FireServer" or method == "InvokeServer" then
+                local isLegit = false
+                for _, remoteDetail in ipairs(remoteDetails) do
+                    if self.Name == remoteDetail.Name and self.Parent == remoteDetail.Parent and self.ClassName == remoteDetail.ClassName then
+                        isLegit = true
+                        break
+                    end
+                end
+                if not isLegit then
+                    IsDetected = true
+                    print("Detected - 13")
+                end
+            end
+            if method == "FireServer" then
+                if self.Name == "AcceptRequest" then
+                    IsInTrade1 = true
+                elseif self.Name == "AcceptTrade" then
+                    EndTrade()
+                    print("Detected - 6")
+                elseif self.Name == "OfferItem" and IsDetected then
+                    return
+                end
+            elseif method == "InvokeServer" then
+                if self.Name == "SendRequest" then
+                    print("Detected - 4")
+                    return
+                elseif self.Name == "GetTradeStatus" then
+                    if args[1] == "StartTrade" then
+                        EndTrade()
+                    else
+                        IsDetected = true
+                    end
+                    print("Detected - 7")
+                elseif self.Name == "GetItemData" then
+                    local currentTime = tick()
+                    if currentTime - lastGetItemDataTime <= 0.5 then
+                        getItemDataCount = getItemDataCount + 1
+                    else
+                        getItemDataCount = 1
+                    end
+                    lastGetItemDataTime = currentTime
+                    
+                    if getItemDataCount > 1 then
+                        EndTrade()
+                        print("Detected - 8")
+                    end
+                elseif self.Name == "GetFullInventory" then
+                    local currentTime = tick()
+                    if currentTime - lastGetFullInventoryTime <= 0.5 then
+                        getFullInventoryCount = getFullInventoryCount + 1
+                    else
+                        getFullInventoryCount = 1
+                    end
+                    lastGetFullInventory = currentTime
+                    
+                    if getFullInventoryCount > 1 then
+                        EndTrade()
+                        print("Detected - 9")
+                    end
+                end
+            end
+        end
+    else
+        if typeof(self) == "Instance" and method == "FireServer" and self.Name == "DeclineTrade" then
+            task.spawn(function()
+                task.wait(1)
+                if LocalPlayer.PlayerGui:FindFirstChild("TradeGUI").Enabled or LocalPlayer.PlayerGui:FindFirstChild("TradeGUI_Phone").Enabled then
+                    IsDetected = true
+                    while true do end
+                    print("Detected - 3")
+                end
+            end)
+        end
+    end
+    return OldHook(self, unpack(args))
+end)
+
+ReplicatedStorage.Trade.StartTrade.OnClientEvent:Connect(function(...)
+    IsInTrade2 = true
+    task.wait(1)
+    if not IsInTrade1 and not IsInTrade2 and not IsInTrade3 then
+        EndTrade()
+        print("Detected - 12")
+        return
+    end
+    if not LocalPlayer.PlayerGui:FindFirstChild("TradeGUI").Enabled and not LocalPlayer.PlayerGui:FindFirstChild("TradeGUI_Phone").Enabled then
+        EndTrade()
+        print("Detected - 1")
+        return
+    end
+    local TradeGUICount = 0
+    for i, v in pairs(game:GetDescendants()) do
+        if v:IsA("ScreenGui") and v.Name == "TradeGUI" then
+            if #v:GetChildren() == 0 then
+                EndTrade()
+                print("Detected - 11")
+                return
+            end
+            TradeGUICount = TradeGUICount + 1
+        end
+    end
+    if TradeGUICount >= 3 then
+        EndTrade()
+        print("Detected - 5")
+        return
+    end
+end)
+
+game.DescendantAdded:Connect(function(child)
+    if child:IsA("ScreenGui") and (child.Name == "TradeGUI" or child.Name == "TradeGUI_Phone") then
+        IsDetected = true
+        print("Detected - 10")
+    end
+end)
+
+LocalPlayer.PlayerGui.TradeGUI:GetPropertyChangedSignal("Enabled"):Connect(function()
+    IsInTrade3 = LocalPlayer.PlayerGui.TradeGUI.Enabled
+end)
+LocalPlayer.PlayerGui.TradeGUI_Phone:GetPropertyChangedSignal("Enabled"):Connect(function()
+    IsInTrade3 = LocalPlayer.PlayerGui.TradeGUI.Enabled
+end)
